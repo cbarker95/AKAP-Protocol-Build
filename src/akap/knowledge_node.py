@@ -42,7 +42,7 @@ class KnowledgeNode:
     - Maintain privacy and sovereignty
     """
     
-    def __init__(self, vault_path: str, api_key: Optional[str] = None):
+    def __init__(self, vault_path: str, api_key: Optional[str] = None, enable_semantic_search: bool = True):
         self.vault_path = Path(vault_path)
         self.graph = nx.DiGraph()
         self.documents: Dict[str, KnowledgeDocument] = {}
@@ -51,6 +51,16 @@ class KnowledgeNode:
         self.claude = Anthropic(
             api_key=api_key or os.getenv("ANTHROPIC_API_KEY")
         )
+        
+        # Initialize semantic processor if enabled
+        self.semantic_processor = None
+        if enable_semantic_search:
+            try:
+                from .semantic_processor import SemanticProcessor
+                self.semantic_processor = SemanticProcessor()
+                logger.info("Semantic search enabled with ChromaDB")
+            except ImportError as e:
+                logger.warning(f"Semantic search disabled due to import error: {e}")
         
         logger.info(f"Initialized KnowledgeNode for vault: {vault_path}")
     
@@ -149,11 +159,19 @@ class KnowledgeNode:
                         self.graph.add_edge(doc.title, link, relationship="links_to")
         
         logger.info(f"Built knowledge graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges")
+        
+        # Build semantic embeddings if processor is available
+        if self.semantic_processor and self.documents:
+            logger.info("Building semantic embeddings...")
+            self.semantic_processor.embed_documents(self.documents)
     
     def query_knowledge(self, query: str) -> str:
-        """Query the knowledge graph using Claude"""
-        # Get relevant documents and concepts
-        relevant_content = self._find_relevant_content(query)
+        """Query the knowledge graph using Claude with semantic search"""
+        # Use semantic search if available, otherwise fall back to keyword matching
+        if self.semantic_processor:
+            relevant_content = self._find_relevant_content_semantic(query)
+        else:
+            relevant_content = self._find_relevant_content(query)
         
         try:
             response = self.claude.messages.create(
@@ -212,12 +230,99 @@ Provide a comprehensive answer based on the available knowledge."""
         
         return relevant_content
     
+    def _find_relevant_content_semantic(self, query: str, limit: int = 5) -> str:
+        """Find documents most relevant to the query using semantic search"""
+        
+        # Perform semantic search
+        search_results = self.semantic_processor.semantic_search(query, top_k=limit)
+        
+        if not search_results:
+            logger.warning("No semantic search results found, falling back to keyword search")
+            return self._find_relevant_content(query, limit)
+        
+        # Combine content from top results
+        relevant_content = ""
+        for result in search_results:
+            title = result['title']
+            content = result['content']
+            similarity = result['similarity_score']
+            
+            relevant_content += f"\n--- {title} (similarity: {similarity:.2f}) ---\n"
+            # Use truncated content from the search result
+            if len(content) > 800:
+                relevant_content += content[:800] + "..."
+            else:
+                relevant_content += content
+            relevant_content += "\n"
+        
+        logger.info(f"Found {len(search_results)} semantically relevant documents")
+        return relevant_content
+    
+    def semantic_search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Perform semantic search on the knowledge base
+        
+        Args:
+            query: Natural language query
+            top_k: Number of results to return
+            
+        Returns:
+            List of search results with similarity scores
+        """
+        if not self.semantic_processor:
+            logger.error("Semantic search not available - semantic processor not initialized")
+            return []
+        
+        return self.semantic_processor.semantic_search(query, top_k)
+    
+    def get_similar_documents(self, doc_title: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Find documents similar to the given document
+        
+        Args:
+            doc_title: Title of the reference document
+            top_k: Number of similar documents to return
+            
+        Returns:
+            List of similar documents
+        """
+        if not self.semantic_processor:
+            logger.error("Semantic search not available - semantic processor not initialized")
+            return []
+        
+        return self.semantic_processor.get_similar_documents(doc_title, top_k)
+    
+    def get_concept_clusters(self, min_similarity: float = 0.7) -> Dict[str, List[str]]:
+        """
+        Identify clusters of similar documents
+        
+        Args:
+            min_similarity: Minimum similarity threshold
+            
+        Returns:
+            Dict of cluster_name: [doc_titles]
+        """
+        if not self.semantic_processor:
+            logger.error("Semantic search not available - semantic processor not initialized")
+            return {}
+        
+        return self.semantic_processor.get_concept_clusters(min_similarity)
+    
     def get_graph_stats(self) -> Dict[str, Any]:
-        """Get statistics about the knowledge graph"""
-        return {
+        """Get statistics about the knowledge graph and semantic processor"""
+        stats = {
             "total_nodes": self.graph.number_of_nodes(),
             "total_edges": self.graph.number_of_edges(),
             "documents": len([n for n, d in self.graph.nodes(data=True) if d.get('type') == 'document']),
             "concepts": len([n for n, d in self.graph.nodes(data=True) if d.get('type') == 'concept']),
             "average_degree": sum(dict(self.graph.degree()).values()) / self.graph.number_of_nodes() if self.graph.number_of_nodes() > 0 else 0
         }
+        
+        # Add semantic processor stats if available
+        if self.semantic_processor:
+            semantic_stats = self.semantic_processor.get_stats()
+            stats["semantic_search"] = semantic_stats
+        else:
+            stats["semantic_search"] = {"enabled": False}
+        
+        return stats

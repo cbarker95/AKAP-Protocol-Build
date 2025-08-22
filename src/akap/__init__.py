@@ -8,7 +8,9 @@ __author__ = "AKAP Protocol Contributors"
 __description__ = "Knowledge sovereignty through AI-assisted collective intelligence"
 
 from .knowledge_node import KnowledgeNode
+from .semantic_processor import SemanticProcessor
 
 __all__ = [
-    "KnowledgeNode"
+    "KnowledgeNode",
+    "SemanticProcessor"
 ]
