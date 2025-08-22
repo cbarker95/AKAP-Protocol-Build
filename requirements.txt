@@ -20,8 +20,16 @@ python-dotenv>=1.0.0
 # Graph Database (Optional)
 # neo4j>=5.0.0
 
-# P2P Networking (Phase 3)
-# libp2p
+# P2P Networking & Federation
+aiohttp>=3.8.0
+cryptography>=41.0.0
+
+# Performance Monitoring
+psutil>=5.9.0
+
+# Web Dashboard
+flask>=2.3.0
+plotly>=5.15.0
 
 # Development Tools
 pytest>=7.0.0
