@@ -1,0 +1,28 @@
+# AKAP Protocol Dependencies
+
+# Core AI/LLM
+anthropic>=0.8.0
+
+# Knowledge Graph & Data Processing
+networkx>=3.0
+python-frontmatter>=1.0.0
+markdown>=3.5.0
+
+# Vector Storage & Search
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+
+# File System & Parsing
+watchdog>=3.0.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Graph Database (Optional)
+# neo4j>=5.0.0
+
+# P2P Networking (Phase 3)
+# libp2p
+
+# Development Tools
+pytest>=7.0.0
+black>=23.0.0
