@@ -9,8 +9,10 @@ __description__ = "Knowledge sovereignty through AI-assisted collective intellig
 
 from .knowledge_node import KnowledgeNode
 from .semantic_processor import SemanticProcessor
+from .pattern_extractor import PatternExtractor
 
 __all__ = [
     "KnowledgeNode",
-    "SemanticProcessor"
+    "SemanticProcessor",
+    "PatternExtractor"
 ]

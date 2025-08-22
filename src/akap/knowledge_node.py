@@ -62,6 +62,9 @@ class KnowledgeNode:
             except ImportError as e:
                 logger.warning(f"Semantic search disabled due to import error: {e}")
         
+        # Initialize pattern extractor
+        self.pattern_extractor = None
+        
         logger.info(f"Initialized KnowledgeNode for vault: {vault_path}")
     
     def scan_vault(self) -> List[Path]:
@@ -164,6 +167,15 @@ class KnowledgeNode:
         if self.semantic_processor and self.documents:
             logger.info("Building semantic embeddings...")
             self.semantic_processor.embed_documents(self.documents)
+        
+        # Initialize pattern extractor after documents are loaded
+        if self.documents:
+            try:
+                from .pattern_extractor import PatternExtractor
+                self.pattern_extractor = PatternExtractor(self)
+                logger.info("Pattern extractor initialized for insight generation")
+            except ImportError as e:
+                logger.warning(f"Pattern extraction disabled due to import error: {e}")
     
     def query_knowledge(self, query: str) -> str:
         """Query the knowledge graph using Claude with semantic search"""
@@ -308,6 +320,72 @@ Provide a comprehensive answer based on the available knowledge."""
         
         return self.semantic_processor.get_concept_clusters(min_similarity)
     
+    def extract_patterns(self) -> Dict[str, Any]:
+        """
+        Extract patterns and generate insights from the knowledge base
+        
+        Returns:
+            Dict containing themes, relationships, gaps, and insights
+        """
+        if not self.pattern_extractor:
+            logger.error("Pattern extraction not available - pattern extractor not initialized")
+            return {}
+        
+        logger.info("Extracting cross-document patterns...")
+        
+        patterns = {
+            'themes': self.pattern_extractor.extract_document_themes(),
+            'concept_relationships': self.pattern_extractor.analyze_concept_relationships(),
+            'knowledge_gaps': self.pattern_extractor.find_knowledge_gaps(),
+            'insights': self.pattern_extractor.generate_insights(),
+            'evolution_patterns': self.pattern_extractor.track_evolution_patterns()
+        }
+        
+        logger.info(f"Pattern extraction complete: {len(patterns['themes'])} themes, {len(patterns['insights'])} insights")
+        return patterns
+    
+    def get_insights(self, max_insights: int = 5) -> List[Dict[str, Any]]:
+        """
+        Generate strategic insights from knowledge patterns
+        
+        Args:
+            max_insights: Maximum number of insights to generate
+            
+        Returns:
+            List of insights with recommendations
+        """
+        if not self.pattern_extractor:
+            logger.error("Pattern extraction not available - pattern extractor not initialized")
+            return []
+        
+        return self.pattern_extractor.generate_insights(max_insights)
+    
+    def find_knowledge_gaps(self) -> List[Dict[str, Any]]:
+        """
+        Identify gaps in knowledge coverage
+        
+        Returns:
+            List of knowledge gaps with suggestions
+        """
+        if not self.pattern_extractor:
+            logger.error("Pattern extraction not available - pattern extractor not initialized")
+            return []
+        
+        return self.pattern_extractor.find_knowledge_gaps()
+    
+    def get_themes(self) -> Dict[str, List[str]]:
+        """
+        Get cross-document themes
+        
+        Returns:
+            Dict of theme_name: [document_titles]
+        """
+        if not self.pattern_extractor:
+            logger.error("Pattern extraction not available - pattern extractor not initialized")
+            return {}
+        
+        return self.pattern_extractor.extract_document_themes()
+    
     def get_graph_stats(self) -> Dict[str, Any]:
         """Get statistics about the knowledge graph and semantic processor"""
         stats = {
@@ -324,5 +402,12 @@ Provide a comprehensive answer based on the available knowledge."""
             stats["semantic_search"] = semantic_stats
         else:
             stats["semantic_search"] = {"enabled": False}
+        
+        # Add pattern extraction stats if available
+        if self.pattern_extractor:
+            pattern_stats = self.pattern_extractor.get_pattern_stats()
+            stats["pattern_extraction"] = pattern_stats
+        else:
+            stats["pattern_extraction"] = {"enabled": False}
         
         return stats
